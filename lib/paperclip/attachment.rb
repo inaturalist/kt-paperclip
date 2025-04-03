@@ -463,6 +463,7 @@ module Paperclip
 
     def reset_file_if_original_reprocessed
       instance_write(:file_size, @queued_for_write[:original].size)
+      instance_write(:content_type, @queued_for_write[:original].content_type)
       assign_fingerprint { @queued_for_write[:original].fingerprint }
       reset_updater
     end

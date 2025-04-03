@@ -173,7 +173,7 @@ describe "Paperclip" do
 
   context "A model that modifies its original" do
     before do
-      rebuild_model styles: { original: "2x2#" }
+      rebuild_model styles: { original: ["2x2#", :jpg] }
       @dummy = Dummy.new
       @file = File.new(fixture_file("5k.png"), "rb")
       @dummy.avatar = @file
@@ -181,6 +181,10 @@ describe "Paperclip" do
 
     it "reports the file size of the processed file and not the original" do
       assert_not_equal File.size(@file.path), @dummy.avatar.size
+    end
+
+    it "reports the content type of the processed file and not the original" do
+      assert_equal "image/jpeg", @dummy.avatar.content_type
     end
 
     after do
