@@ -1,5 +1,20 @@
-7.4.0 [UNRELEASED]
+8.1.0 [UNRELEASED]
+* Documentation: Document Oracle Object Storage via [paperclip-oracle-object-storage](https://github.com/prosas/paperclip-oracle-object-storage).
+
+8.0.1 (2026-10-12)
+* Security: Fix a content type spoof detection regression introduced in 8.0.0 (https://github.com/kreeti/kt-paperclip/issues/173). `Paperclip::MediaTypeSpoofDetector` now determines the content type from the file contents only. 8.0.0 passed the filename to Marcel as a hint, so content without a magic number of its own -- plain text, for example -- was typed from its extension, and a text file renamed to ".jpg" was accepted as `image/jpeg`.
+* Spoof detection now consults both magic-number detection and the Unix `file` utility, and accepts a file when either supports the supplied type. This keeps SVG uploads working: an SVG opening with an XML declaration has no magic number of its own.
+* Spoof detection no longer rejects a file whose contents cannot be identified at all, which previously produced false positives for text uploads on systems without the `file` utility.
+* `:content_type_mappings` values are again matched against the type detected from the file contents, as documented in the README. If you adjusted a mapping for 8.0.0, revert it to the content-derived value.
+* `Paperclip::ContentTypeDetector` is unchanged: stored content types still use the filename as a hint, so `.csv`, `.txt` and `.xlsm` uploads keep their specific types.
+
+8.0.0 (2026-06-30)
 * Version Support: Drop support for Ruby 2.6 and earlier (Rails support stays at 4.2 and later)
+* Officially support ImageMagick 7 using the `magick` command.
+* Extract out `Paperclip::Commands::ImageMagick` and `Paperclip::Commands::UnixFile` utilities.
+* Use Marcel gem consistently as a first choice for content type detection, with a fallback to Unix `file` utility.
+* Add `Paperclip::Geometry#==` method for comparison.
+* Add frozen string literal comment to all files.
 * Add Github Actions CI to ensure support Ruby 2.7+, Rails 4.2+, ImageMagick 6 and 7, JRuby, and TruffleRuby.
 * Fix all failing specs on all Ruby versions.
 * Fix issues with Rails deprecation in tests.
@@ -9,6 +24,11 @@
 * Change "NEWS" and "OLD_NEWS" files to "CHANGELOG.md".
 * Remove UPGRADING message.
 * Remove cruft files: .travis.yml, .codeclimate.yml, .hound.yml
+* Terrapin gem: Do not set explicitly set `Terrapin::CommandLine.path` (fix thread safety).
+* Deprecation: Deprecate `Paperclip.options[:command_path]` in favor of `:imagemagick_path` and `:file_command_path`.
+* Deprecation: Deprecate `Paperclip::GeometryDetector` and `Paperclip::GeometryParser` in favor of `Paperclip::Commands::ImageMagick::GeometryParser`.
+* Deprecation: Deprecate `Paperclip::FileCommandContentTypeDetector` in favor of `Paperclip::ContentTypeDetector`.
+* Deprecation: Deprecate `Paperclip.run` in favor of `Paperclip::Commands::Runner.run`.
 
 7.3.0 (2026-01-31)
 * Fix BOM for gd locale (https://github.com/kreeti/kt-paperclip/pull/158)
