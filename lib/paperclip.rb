@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Paperclip allows file attachments that are stored in the filesystem. All graphical
 # transformations are done using the Graphics/ImageMagick command line utilities and
 # are stored in Tempfiles until the record is saved. Paperclip does not require a
@@ -29,8 +31,13 @@ require "erb"
 require "digest"
 require "tempfile"
 require "paperclip/version"
-require "paperclip/geometry_parser_factory"
-require "paperclip/geometry_detector_factory"
+require "paperclip/commands/runner"
+require "paperclip/commands/imagemagick"
+require "paperclip/commands/imagemagick/version_detector"
+require "paperclip/commands/imagemagick/geometry_parser"
+require "paperclip/commands/unix_file"
+require "paperclip/geometry_parser_factory" # @deprectated
+require "paperclip/geometry_detector_factory" # @deprectated
 require "paperclip/geometry"
 require "paperclip/processor"
 require "paperclip/processor_helpers"
@@ -43,7 +50,7 @@ require "paperclip/style"
 require "paperclip/attachment"
 require "paperclip/storage"
 require "paperclip/callbacks"
-require "paperclip/file_command_content_type_detector"
+require "paperclip/file_command_content_type_detector" # @deprectated
 require "paperclip/media_type_spoof_detector"
 require "paperclip/content_type_detector"
 require "paperclip/glue"
@@ -93,8 +100,11 @@ module Paperclip
   #   image's orientation. Defaults to true.
   def self.options
     @options ||= {
-      command_path: nil,
+      command_path: nil, # @deprecated Will be removed in Paperclip 8.0.
+      file_command_path: nil,
+      imagemagick_path: nil,
       content_type_mappings: {},
+      imagemagick_version: nil,
       log: true,
       log_command: true,
       read_timeout: nil,
@@ -104,6 +114,13 @@ module Paperclip
       is_windows: Gem.win_platform?,
       add_validation_errors_to: :both
     }
+    if @options[:command_path]
+      Paperclip.deprecator.warn(
+        "Paperclip.options[:command_path] will be removed in Paperclip 8.0. Please use " \
+        "Paperclip.options[:imagemagick_path] and/or Paperclip.options[:file_command_path] instead."
+      )
+    end
+    @options
   end
 
   def self.io_adapters=(new_registry)

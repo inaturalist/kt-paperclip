@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 describe Paperclip::ContentTypeDetector do
@@ -25,7 +27,13 @@ describe Paperclip::ContentTypeDetector do
   end
 
   it "returns content type of file if it is an acceptable type" do
-    allow(MIME::Types).to receive(:type_for).and_return([MIME::Type.new("application/mp4"), MIME::Type.new("video/mp4"), MIME::Type.new("audio/mp4")])
+    allow(MIME::Types).to receive(:type_for).and_return(
+      [
+        MIME::Type.new("content-type" => "application/mp4"),
+        MIME::Type.new("content-type" => "video/mp4"),
+        MIME::Type.new("content-type" => "audio/mp4")
+      ]
+    )
     allow_any_instance_of(Paperclip::ContentTypeDetector).to receive(:type_from_file_contents).and_return("video/mp4")
     @filename = "my_file.mp4"
     assert_equal "video/mp4", Paperclip::ContentTypeDetector.new(@filename).detect
@@ -37,6 +45,19 @@ describe Paperclip::ContentTypeDetector do
       file.puts "This is a text file."
       file.rewind
       assert_equal "text/plain", Paperclip::ContentTypeDetector.new(file.path).detect
+    end
+    FileUtils.rm @filename
+  end
+
+  # The filename is a deliberate input here -- it is what distinguishes .xlsm from .xlsx above, and
+  # what keeps a .csv from being stored as text/plain. The check that must ignore the filename is
+  # Paperclip::MediaTypeSpoofDetector; see its spec.
+  it "uses the filename as a hint when the contents are ambiguous" do
+    @filename = "#{Dir.tmpdir}/wrong.jpg"
+    File.open(@filename, "w+") do |file|
+      file.puts "WRONG IMAGE"
+      file.rewind
+      assert_equal "image/jpeg", Paperclip::ContentTypeDetector.new(file.path).detect
     end
     FileUtils.rm @filename
   end
