@@ -1,35 +1,42 @@
+# frozen_string_literal: true
+
 module Paperclip
   # Defines the geometry of an image.
   class Geometry
-    attr_accessor :height, :width, :modifier
+    attr_accessor :height, :width, :modifier, :orientation
 
     EXIF_ROTATED_ORIENTATION_VALUES = [5, 6, 7, 8].freeze
 
     # Gives a Geometry representing the given height and width
-    def initialize(width = nil, height = nil, modifier = nil)
+    def initialize(width = nil, height = nil, modifier = nil, orientation = nil)
       if width.is_a?(Hash)
         options = width
         @height = options[:height].to_f
         @width = options[:width].to_f
-        @modifier = options[:modifier]
+        @modifier = options[:modifier].presence
         @orientation = options[:orientation].to_i
       else
         @height = height.to_f
         @width  = width.to_f
-        @modifier = modifier
+        @modifier = modifier.presence
+        @orientation = orientation.to_i
       end
     end
 
     # Extracts the Geometry from a file (or path to a file)
+    #
+    # @deprecated Will be removed in Paperclip 8.0.
     def self.from_file(file)
-      GeometryDetector.new(file).make
+      Commands::ImageMagick::GeometryParser.from_file(file)
     end
 
     # Extracts the Geometry from a "WxH,O" string
     # Where W is the width, H is the height,
     # and O is the EXIF orientation
+    #
+    # @deprecated Will be removed in Paperclip 8.0.
     def self.parse(string)
-      GeometryParser.new(string).make
+      Commands::ImageMagick::GeometryParser.parse(string)
     end
 
     # Swaps the height and width if necessary
@@ -72,11 +79,19 @@ module Paperclip
 
     # Returns the width and height in a format suitable to be passed to Geometry.parse
     def to_s
-      s = String.new
+      s = +""
       s << width.to_i.to_s if width > 0
       s << "x#{height.to_i}" if height > 0
       s << modifier.to_s
       s
+    end
+
+    def ==(other)
+      other.is_a?(Geometry) &&
+        width == other.width &&
+        height == other.height &&
+        modifier == other.modifier &&
+        orientation == other.orientation
     end
 
     # Same as to_s

@@ -90,76 +90,44 @@ Requirements
 
 ### Ruby and Rails
 
-Paperclip now requires Ruby version **>= 2.3** and Rails version **>= 4.2**
+Paperclip now requires Ruby version **>= 2.7** and Rails version **>= 5.2**
 (only if you're going to use Paperclip with Ruby on Rails).
 
-### Image Processor
+### ImageMagick Image Processor
 
-[ImageMagick](http://www.imagemagick.org) must be installed and Paperclip must have access to it. To ensure
-that it does, on your command line, run `which convert` (one of the ImageMagick
-utilities). This will give you the path where that utility is installed. For
-example, it might return `/usr/local/bin/convert`.
+[ImageMagick](http://www.imagemagick.org) must be installed and Paperclip must have access to it.
+Refer to ImageMagick's [installations instructions](https://imagemagick.org/download/).
+ImageMagick 7 is the latest version. As of April 2026, some package managers such as `apt`
+still install ImageMagick 6.
 
-Then, in your environment config file, let Paperclip know to look there by adding that
-directory to its path.
-
-In development mode, you might add this line to `config/environments/development.rb)`:
+Paperclip supports both ImageMagick versions 6 and 7, and will auto-detect your version.
+You may enforce a specific version in an initializer such as `config/initializers/paperclip.rb`:
 
 ```ruby
-Paperclip.options[:command_path] = "/usr/local/bin/"
+Paperclip.options[:imagemagick_version] = "7"
 ```
 
-If you're on Mac OS X, you'll want to run the following with [Homebrew](http://www.brew.sh):
+Please ensure ImageMagick is in your environment path, or alternatively set
+the path manually in an initializer:
 
-    brew install imagemagick
+```ruby
+Paperclip.options[:imagemagick_path] = "/usr/local/bin/"
+```
 
-If you are dealing with pdf uploads or running the test suite, you'll also need
-to install GhostScript. On Mac OS X, you can also install that using Homebrew:
+### Optional: Unix `file` Command
 
-    brew install gs
+Paperclip uses the [Marcel gem](https://github.com/rails/marcel) to detect file content types.
+If Marcel cannot detect the type, the [Unix `file` command](https://en.wikipedia.org/wiki/File_(command))
+is used as an optional fallback. To use it, ensure `file` is in your environment path,
+or alternatively set its path manually in an initializer:
 
-If you are on Ubuntu (or any Debian base Linux distribution), you'll want to run
-the following with apt-get:
+```ruby
+Paperclip.options[:file_command_path] = "/usr/local/bin/"
+```
 
-    sudo apt-get install imagemagick -y
-
-### `file`
-
-The Unix [`file` command](https://en.wikipedia.org/wiki/File_(command)) is required for content-type checking.
-This utility isn't available in Windows, but comes bundled with Ruby [Devkit](https://github.com/oneclick/rubyinstaller/wiki/Development-Kit),
-so Windows users must make sure that the devkit is installed and added to the system `PATH`.
-
-**Manual Installation**
-
-If you're using Windows 7+ as a development environment, you may need to install the `file.exe` application manually. The `file spoofing` system in Paperclip 4+ relies on this; if you don't have it working, you'll receive `Validation failed: Upload file has an extension that does not match its contents.` errors.
-
-To manually install, you should perform the following:
-
-> **Download & install `file` from [this URL](http://gnuwin32.sourceforge.net/packages/file.htm)**
-
-To test, you can use the image below:
-![untitled](https://cloud.githubusercontent.com/assets/1104431/4524452/a1f8cce4-4d44-11e4-872e-17adb96f79c9.png)
-
-Next, you need to integrate with your environment - preferably through the `PATH` variable, or by changing your `config/environments/development.rb` file
-
-**PATH**
-
-    1. Click "Start"
-    2. On "Computer", right-click and select "Properties"
-    3. In Properties, select "Advanced System Settings"
-    4. Click the "Environment Variables" button
-    5. Locate the "PATH" var - at the end, add the path to your newly installed `file.exe` (typically `C:\Program Files (x86)\GnuWin32\bin`)
-    6. Restart any CMD shells you have open & see if it works
-
-OR
-
-**Environment**
-
-    1. Open `config/environments/development.rb`
-    2. Add the following line: `Paperclip.options[:command_path] = 'C:\Program Files (x86)\GnuWin32\bin'`
-    3. Restart your Rails server
-
-Either of these methods will give your Rails setup access to the `file.exe` functionality, thus providing the ability to check the contents of a file (fixing the spoofing problem)
+Windows users should install the `file` utility via the Ruby Installer for Windows'
+[DevKit](https://github.com/oneclick/rubyinstaller/wiki/Development-Kit), or alternatively,
+by installing [MSYS2](https://www.msys2.org/) which provides Unix utilities for Windows.
 
 ---
 
@@ -171,7 +139,7 @@ Paperclip is distributed as a gem, which is how it should be used in your app.
 Include the gem in your Gemfile:
 
 ```ruby
-gem "kt-paperclip", "~> 6.4", ">= 6.4.1"
+gem "kt-paperclip", "~> 8.0"
 ```
 
 Or, if you want to get the latest, you can get master from the main paperclip repository:
@@ -407,8 +375,10 @@ validates_attachment :avatar,
   content_type: ["image/jpeg", "image/gif", "image/png"]
 ```
 
-`Paperclip::ContentTypeDetector` will attempt to match a file's extension to an
-inferred content_type, regardless of the actual contents of the file.
+`Paperclip::ContentTypeDetector` uses the file's extension as a hint when the contents alone are
+ambiguous, so the stored `content_type` is not by itself proof of what a file contains. The check
+that ignores the filename entirely is `validates_media_type_spoof_detection` (see Security
+Validations below); use it alongside your `content_type` validation.
 
 ### Duplicate error messages
 
@@ -476,16 +446,25 @@ being uploaded as JPEGs, but will not prevent GIFs from being uploaded with a
 `.jpg` extension. This validation will only add validation errors to the form. It
 will not cause errors to be raised.
 
+The type is detected from the file's contents only, using magic-number detection plus the Unix
+`file` utility. The filename is never consulted. Where `file` is unavailable the check falls back
+to magic-number detection alone, which cannot identify text-based formats; content it cannot
+identify at all is accepted rather than rejected.
+
 This can sometimes cause false validation errors in applications that use custom
 file extensions. In these cases you may wish to add your custom extension to the
 list of content type mappings by creating `config/initializers/paperclip.rb`:
 
 ```ruby
-# Allow ".foo" as an extension for files with the MIME type "text/plain".
+# Allow ".foo" as an extension for files whose contents are detected as "text/plain".
 Paperclip.options[:content_type_mappings] = {
   foo: %w(text/plain)
 }
 ```
+
+The value is the type the *contents* detect as (what `file -b --mime` reports), not the type you
+would like the extension to mean. Text-based formats such as SVG and CSV are the usual reason to
+need one.
 
 ---
 
@@ -602,6 +581,7 @@ gems along side with Paperclip:
 * [paperclip-azure](https://github.com/supportify/paperclip-azure)
 * [paperclip-azure-storage](https://github.com/gmontard/paperclip-azure-storage)
 * [paperclip-dropbox](https://github.com/janko-m/paperclip-dropbox)
+* [paperclip-oracle-object-storage](https://github.com/prosas/paperclip-oracle-object-storage)
 
 ### Understanding Storage
 
